@@ -1,21 +1,32 @@
 import { NextResponse } from "next/server";
-
-const WEBHOOK_URL =
-  "https://hook.us2.make.com/hovwbcemwqtyyjlcglcme5d4jl7uloop";
+import { getFormById } from "@/lib/forms";
 
 export async function POST(request) {
   try {
     const body = await request.json();
+    const { formId, name, country, contact } = body;
 
-    console.log("API Route: Received data:", body);
-    console.log("API Route: Forwarding to webhook:", WEBHOOK_URL);
+    const form = getFormById(formId) || getFormById("pearlshire");
 
-    const response = await fetch(WEBHOOK_URL, {
+    if (!form) {
+      return NextResponse.json(
+        { success: false, error: "Form configuration not found" },
+        { status: 404 }
+      );
+    }
+
+    console.log(`API Route: Received submission for form [${form.id} - ${form.title}]`);
+    console.log("API Route: Forwarding payload to webhook:", form.webhookUrl);
+
+    // Forward clean payload expected by Make.com webhooks
+    const payload = { name, country, contact };
+
+    const response = await fetch(form.webhookUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
     });
 
     console.log("API Route: Webhook response status:", response.status);
@@ -25,7 +36,7 @@ export async function POST(request) {
 
     if (response.ok) {
       return NextResponse.json(
-        { success: true, message: "Data sent successfully" },
+        { success: true, message: "Data sent successfully", form: form.id },
         { status: 200 }
       );
     } else {
